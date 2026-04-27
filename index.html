@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GUGGLGOODS — GUSTAV FRIEBEL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0A0000;
+      --red:     #CC0000;
+      --red-dim: #660000;
+      --white:   #FFFFFF;
+      --white2:  #DDDDDD;
+      --grid-px: 24px;
+    }
+
+    /* ── Base ─────────────────────────────────────────────────── */
+    html, body { width: 100%; min-height: 100vh; }
+
+    body {
+      font-family: 'VT323', monospace;
+      background-color: var(--bg);
+      color: var(--white);
+      cursor: none;
+      overflow-x: hidden;
+      /* pixel grid */
+      background-image:
+        linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size: var(--grid-px) var(--grid-px);
+    }
+
+    /* scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 999;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,.18) 3px,
+        rgba(0,0,0,.18) 4px
+      );
+    }
+
+    /* ── Custom cursor ──────────────────────────────────────────── */
+    #cursor {
+      position: fixed;
+      width: 36px;
+      height: 36px;
+      pointer-events: none;
+      z-index: 10000;
+      transform: translate(-50%, -50%);
+      transition: transform .08s ease;
+      will-change: transform, left, top;
+    }
+    #cursor.clicking {
+      transform: translate(-50%, -50%) scale(.65) skewX(20deg);
+      filter: hue-rotate(150deg) brightness(1.8);
+    }
+    #cursor img { display: block; width: 100%; height: 100%; }
+
+    /* ── Win titlebar component ─────────────────────────────────── */
+    .win {
+      border: 2px solid var(--white);
+      background: var(--bg);
+    }
+    .win-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--white);
+      color: var(--bg);
+      padding: 3px 8px;
+      font-size: 1.1rem;
+      letter-spacing: .08em;
+    }
+    .win-bar-btns { display: flex; gap: 4px; }
+    .win-bar-btn {
+      width: 16px; height: 16px;
+      border: 1px solid var(--bg);
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'VT323', monospace;
+      font-size: .85rem;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+      cursor: none;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 28px 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .header-win { }
+
+    .header-body {
+      padding: 20px 24px 24px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .header-logo {
+      width: 96px;
+      height: 96px;
+      flex-shrink: 0;
+    }
+
+    .header-text { display: flex; flex-direction: column; gap: 6px; }
+
+    .header-name {
+      font-size: 4.2rem;
+      line-height: 1;
+      color: var(--white);
+      letter-spacing: .04em;
+    }
+    .header-name span { color: var(--red); }
+
+    .header-alias {
+      font-size: 1.6rem;
+      color: var(--red);
+      letter-spacing: .12em;
+    }
+
+    .header-bio {
+      font-size: 1.4rem;
+      color: var(--white2);
+      letter-spacing: .04em;
+      margin-top: 4px;
+    }
+
+    .blink {
+      display: inline-block;
+      animation: blink 1s step-end infinite;
+      color: var(--red);
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ── Decorative bar ─────────────────────────────────────────── */
+    .deco-bar {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      height: 4px;
+      overflow: hidden;
+      opacity: .35;
+    }
+    .deco-bar span {
+      display: inline-block;
+      height: 100%;
+      flex: 1;
+      background: var(--white);
+    }
+    .deco-bar span:nth-child(odd) { background: var(--red); }
+
+    /* ── Grid ──────────────────────────────────────────────────── */
+    .projects-win { }
+
+    .projects-body {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    /* ── Tile ──────────────────────────────────────────────────── */
+    .tile {
+      border: 2px solid var(--white2);
+      position: relative;
+      cursor: none;
+      transition: border-color .12s;
+      background: #110000;
+    }
+    .tile:hover { border-color: var(--red); }
+
+    .tile-img-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+    }
+
+    .tile-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      /* red monochrome tint — removes on hover */
+      filter: sepia(1) hue-rotate(310deg) saturate(2.5) brightness(.85);
+      transition: filter .35s ease;
+    }
+    .tile:hover .tile-img-wrap img {
+      filter: none;
+    }
+
+    /* red corner tick marks */
+    .tile-img-wrap::before,
+    .tile-img-wrap::after {
+      content: '';
+      position: absolute;
+      width: 10px; height: 10px;
+      border-color: var(--red);
+      border-style: solid;
+      z-index: 2;
+      transition: border-color .12s;
+    }
+    .tile-img-wrap::before { top: 0; right: 0; border-width: 2px 2px 0 0; }
+    .tile-img-wrap::after  { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+
+    .tile-label {
+      padding: 6px 10px;
+      font-size: 1.2rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--white);
+      border-top: 1px solid var(--white2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tile:hover .tile-label { border-color: var(--red); color: var(--red); }
+
+    .tile-label-num {
+      font-size: .95rem;
+      color: var(--red-dim);
+    }
+    .tile:hover .tile-label-num { color: var(--red); }
+
+    /* Kontakt tile */
+    .tile--kontakt .tile-label { font-size: 1.4rem; }
+
+    /* ── Status bar ─────────────────────────────────────────────── */
+    .statusbar {
+      border-top: 1px solid var(--white2);
+      padding: 4px 20px;
+      font-size: 1rem;
+      display: flex;
+      gap: 24px;
+      color: var(--white2);
+      letter-spacing: .06em;
+    }
+    .statusbar span { color: var(--red); }
+
+    /* ── Modal ─────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.88);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s;
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-win {
+      width: min(92vw, 900px);
+      border: 2px solid var(--white);
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      transform: scale(.95);
+      transition: transform .18s;
+    }
+    .modal-overlay.open .modal-win { transform: scale(1); }
+
+    .modal-img-area {
+      background: #110000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      min-height: 200px;
+    }
+    #modal-img {
+      max-width: 100%;
+      max-height: calc(90vh - 120px);
+      display: block;
+      object-fit: contain;
+    }
+
+    .modal-footer {
+      border-top: 2px solid var(--white);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg);
+    }
+    .modal-nav { display: flex; gap: 8px; }
+
+    .modal-btn {
+      border: 2px solid var(--white);
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      letter-spacing: .08em;
+      padding: 2px 14px;
+      cursor: none;
+      transition: background .1s, color .1s;
+    }
+    .modal-btn:hover { background: var(--white); color: var(--bg); }
+    .modal-btn:disabled { opacity: .3; pointer-events: none; }
+
+    .modal-counter {
+      font-size: 1.2rem;
+      color: var(--red);
+      letter-spacing: .1em;
+    }
+
+    /* ── Responsive ─────────────────────────────────────────────── */
+    @media (max-width: 720px) {
+      .projects-body { grid-template-columns: repeat(2, 1fr); }
+      .header-name { font-size: 3rem; }
+    }
+    @media (max-width: 480px) {
+      .projects-body { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Custom ball cursor -->
+<div id="cursor">
+  <img src="logo.png" alt="" />
+</div>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="win header-win">
+    <div class="win-bar">
+      <span>GUGGLGOODS.EXE</span>
+      <div class="win-bar-btns">
+        <div class="win-bar-btn">_</div>
+        <div class="win-bar-btn">□</div>
+        <div class="win-bar-btn">✕</div>
+      </div>
+    </div>
+    <div class="header-body">
+      <!-- Logo ball -->
+      <img class="header-logo" src="logo.png" alt="gugglgoods logo" />
+
+      <div class="header-text">
+        <div class="header-alias">&gt; GUGGLGOODS</div>
+        <div class="header-name">GUSTAV <span>FRIEBEL</span></div>
+        <div class="header-bio">
+          Product Designer. Master's @ UdK Berlin. generally just a chill guy.<span class="blink">_</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deco bar -->
+  <div class="deco-bar">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <!-- Projects -->
+  <div class="win projects-win">
+    <div class="win-bar">
+      <span>PROJECTS // SELECT TO OPEN</span>
+      <div class="win-bar-btns">
+        <div class="win-bar-btn">_</div>
+        <div class="win-bar-btn">□</div>
+        <div class="win-bar-btn">✕</div>
+      </div>
+    </div>
+    <div class="projects-body" id="grid"></div>
+    <div class="statusbar">
+      <span>6</span>&nbsp;ITEMS &nbsp;|&nbsp; READY<span>_</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-win win">
+    <div class="win-bar">
+      <span id="modal-title">PROJECT</span>
+      <div class="win-bar-btns">
+        <div class="win-bar-btn" id="modal-close">✕</div>
+      </div>
+    </div>
+    <div class="modal-img-area">
+      <img id="modal-img" src="" alt="" />
+    </div>
+    <div class="modal-footer">
+      <div class="modal-nav">
+        <button class="modal-btn" id="btn-prev">◄ PREV</button>
+        <button class="modal-btn" id="btn-next">NEXT ►</button>
+      </div>
+      <span class="modal-counter" id="modal-counter">01 / 03</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Custom cursor ──────────────────────────────────────────────
+  const cur = document.getElementById('cursor');
+  document.addEventListener('mousemove', (e) => {
+    cur.style.left = e.clientX + 'px';
+    cur.style.top  = e.clientY + 'px';
+  });
+  document.addEventListener('mousedown', () => cur.classList.add('clicking'));
+  document.addEventListener('mouseup',   () => cur.classList.remove('clicking'));
+
+  // ── Project data ───────────────────────────────────────────────
+  const PROJECTS = [
+    {
+      name: 'Leafdrop',
+      num: '01',
+      images: [
+        'Leafdrop/Portfolio Gustav Friebel_Seite_03.jpg',
+        'Leafdrop/Portfolio Gustav Friebel_Seite_04.jpg',
+        'Leafdrop/Portfolio Gustav Friebel_Seite_05.jpg',
+      ]
+    },
+    {
+      name: 'Eckhardt',
+      num: '02',
+      images: [
+        'Eckhardt/Portfolio Gustav Friebel_Seite_06.jpg',
+        'Eckhardt/Portfolio Gustav Friebel_Seite_07.jpg',
+        'Eckhardt/Portfolio Gustav Friebel_Seite_08.jpg',
+      ]
+    },
+    {
+      name: 'Imprimograph',
+      num: '03',
+      images: [
+        'Imprimograph/Portfolio Gustav Friebel_Seite_09.jpg',
+        'Imprimograph/Portfolio Gustav Friebel_Seite_10.jpg',
+        'Imprimograph/Portfolio Gustav Friebel_Seite_11.jpg',
+        'Imprimograph/Portfolio Gustav Friebel_Seite_12.jpg',
+      ]
+    },
+    {
+      name: 'Amytis',
+      num: '04',
+      images: [
+        'Amytis/Portfolio Gustav Friebel_Seite_13.jpg',
+        'Amytis/Portfolio Gustav Friebel_Seite_14.jpg',
+        'Amytis/Portfolio Gustav Friebel_Seite_15.jpg',
+      ]
+    },
+    {
+      name: 'Read the Room',
+      num: '05',
+      images: [
+        'Read the Room/Portfolio Gustav Friebel_Seite_16.jpg',
+        'Read the Room/Portfolio Gustav Friebel_Seite_17.jpg',
+        'Read the Room/Portfolio Gustav Friebel_Seite_18.jpg',
+        'Read the Room/Portfolio Gustav Friebel_Seite_19.jpg',
+      ]
+    },
+    {
+      name: 'Kontakt',
+      num: '///',
+      kontakt: true,
+      images: [
+        'Kontakt/Portfolio Gustav Friebel_Seite_20.jpg',
+      ]
+    }
+  ];
+
+  // ── Build tiles ────────────────────────────────────────────────
+  const grid = document.getElementById('grid');
+
+  PROJECTS.forEach((proj) => {
+    const tile = document.createElement('div');
+    tile.className = 'tile' + (proj.kontakt ? ' tile--kontakt' : '');
+    tile.innerHTML = `
+      <div class="tile-img-wrap">
+        <img src="${proj.images[0]}" alt="${proj.name}" loading="lazy" />
+      </div>
+      <div class="tile-label">
+        <span>${proj.name.toUpperCase()}</span>
+        <span class="tile-label-num">${proj.num}</span>
+      </div>
+    `;
+    tile.addEventListener('click', () => openModal(proj));
+    grid.appendChild(tile);
+  });
+
+  // ── Modal ──────────────────────────────────────────────────────
+  let curImages = [], curIdx = 0;
+
+  const overlay   = document.getElementById('modal-overlay');
+  const modalImg  = document.getElementById('modal-img');
+  const modalTitle = document.getElementById('modal-title');
+  const counter   = document.getElementById('modal-counter');
+  const btnPrev   = document.getElementById('btn-prev');
+  const btnNext   = document.getElementById('btn-next');
+
+  function openModal(proj) {
+    curImages = proj.images;
+    curIdx = 0;
+    modalTitle.textContent = proj.name.toUpperCase() + ' // ' + proj.num;
+    updateModal();
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function updateModal() {
+    modalImg.src = curImages[curIdx];
+    counter.textContent = pad(curIdx + 1) + ' / ' + pad(curImages.length);
+    btnPrev.disabled = curIdx === 0;
+    btnNext.disabled = curIdx === curImages.length - 1;
+  }
+
+  btnPrev.addEventListener('click', () => { if (curIdx > 0) { curIdx--; updateModal(); } });
+  btnNext.addEventListener('click', () => { if (curIdx < curImages.length - 1) { curIdx++; updateModal(); } });
+
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (!overlay.classList.contains('open')) return;
+    if (e.key === 'Escape')     closeModal();
+    if (e.key === 'ArrowLeft')  { if (curIdx > 0)                  { curIdx--; updateModal(); } }
+    if (e.key === 'ArrowRight') { if (curIdx < curImages.length-1) { curIdx++; updateModal(); } }
+  });
+</script>
+</body>
+</html>
